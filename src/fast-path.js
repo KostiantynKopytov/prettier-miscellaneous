@@ -188,7 +188,11 @@ FastPath.prototype.needsParens = function(options) {
     parent.body === node &&
     node.type !== "SequenceExpression" && // these have parens added anyway
       startsWithNoLookaheadToken(node, /* forbidFunctionAndClass */ false)) ||
-    (parent.type === "ExpressionStatement" &&
+    (parent.type === "ArrowFunctionExpression" && 
+    parent.returnType === node &&
+    node.type === 'TSTypeAnnotation' &&
+    node.typeAnnotation.type === 'TSFunctionType') ||
+      (parent.type === "ExpressionStatement" &&
       startsWithNoLookaheadToken(node, /* forbidFunctionAndClass */ true))
   ) {
     return true;
@@ -351,8 +355,10 @@ FastPath.prototype.needsParens = function(options) {
         (parent.type === "TypeParameter" ||
           parent.type === "VariableDeclarator" ||
           parent.type === "TypeAnnotation" ||
+          parent.type === "TSTypeAnnotation" ||
           parent.type === "GenericTypeAnnotation") &&
-        (node.typeAnnotation.type === "TypeAnnotation" &&
+        ((node.typeAnnotation.type === "TypeAnnotation" || 
+          node.typeAnnotation.type === "TSTypeAnnotation") &&
           node.typeAnnotation.typeAnnotation.type !== "TSFunctionType" &&
           grandParent.type !== "TSTypeOperator")
       ) {

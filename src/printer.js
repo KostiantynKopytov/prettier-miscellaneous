@@ -250,7 +250,9 @@ function getPropertyPadding(options, path) {
     if (!p.key) {
       return 0;
     }
-    return p.key.end - p.key.start + (p.computed ? 2 : 0);
+    return typeof p.key.end === "number"
+      ? p.key.end - p.key.start + (p.computed ? 2 : 0)
+      : p.key.range[1] - p.key.range[0] + (p.computed ? 2 : 0);
   });
   const maxLength = Math.max.apply(null, lengths);
   const padLength = maxLength - nameLength + 1;
@@ -650,7 +652,7 @@ function genericPrintNoParens(path, options, print, args) {
       }
 
       return path.call(print, "id");
-    case "TSExportAssigment":
+    case "TSExportAssignment":
       return concat(["export = ", path.call(print, "expression"), semi]);
     case "ExportDefaultDeclaration":
     case "ExportNamedDeclaration":
@@ -886,7 +888,6 @@ function genericPrintNoParens(path, options, print, args) {
     }
     case "TSInterfaceDeclaration":
       parts.push(
-        n.abstract ? "abstract " : "",
         printTypeScriptModifiers(path, options, print),
         "interface ",
         path.call(print, "id"),
@@ -1977,6 +1978,7 @@ function genericPrintNoParens(path, options, print, args) {
       throw new Error("unprintable type: " + JSON.stringify(n.type));
     // Type Annotations for Facebook Flow, typically stripped out or
     // transformed away before printing.
+    case "TSTypeAnnotation":
     case "TypeAnnotation":
       if (n.typeAnnotation) {
         return path.call(print, "typeAnnotation");
@@ -2339,6 +2341,8 @@ function genericPrintNoParens(path, options, print, args) {
       ]);
     case "TypeParameterDeclaration":
     case "TypeParameterInstantiation":
+    case "TSTypeParameterDeclaration":
+    case "TSTypeParameterInstantiation":
       return printTypeParameters(path, options, print, "params");
     case "TypeParameter": {
       const variance = getFlowVariance(n);
@@ -2574,7 +2578,11 @@ function genericPrintNoParens(path, options, print, args) {
       parts.push(path.call(print, "name"));
 
       if (n.constraint) {
-        parts.push(" in ", path.call(print, "constraint"));
+        if (n.constraint.operator === "keyof") {
+          parts.push(" in ", path.call(print, "constraint"));
+        } else {
+          parts.push(" extends ", path.call(print, "constraint"));          
+        }
       }
 
       return concat(parts);
@@ -2610,11 +2618,9 @@ function genericPrintNoParens(path, options, print, args) {
 
       return group(concat(parts));
     case "TSEnumDeclaration":
-      if (n.modifiers) {
-        parts.push(printTypeScriptModifiers(path, options, print));
-      }
+      parts.push(printTypeScriptModifiers(path, options, print));
 
-      parts.push("enum ", path.call(print, "name"), " ");
+      parts.push("enum ", path.call(print, n.id ? "id" : "name"), " ");
 
       if (n.members.length === 0) {
         parts.push(
@@ -2653,7 +2659,7 @@ function genericPrintNoParens(path, options, print, args) {
 
       return concat(parts);
     case "TSEnumMember":
-      parts.push(path.call(print, "name"));
+      parts.push(path.call(print, n.id ? "id" : "name"));
       if (n.initializer) {
         parts.push(" = ", path.call(print, "initializer"));
       }
@@ -2676,10 +2682,14 @@ function genericPrintNoParens(path, options, print, args) {
       return concat(["require(", path.call(print, "expression"), ")"]);
     case "TSModuleDeclaration": {
       const parent = path.getParentNode();
-      const isExternalModule = isLiteral(n.name);
+      const isExternalModule = isLiteral(n.id);
       const parentIsDeclaration = parent.type === "TSModuleDeclaration";
       const bodyIsDeclaration = n.body && n.body.type === "TSModuleDeclaration";
 
+      if (n.declare) {
+        parts.push("declare ");
+      }
+      
       if (parentIsDeclaration) {
         parts.push(".");
       } else {
@@ -2688,10 +2698,10 @@ function genericPrintNoParens(path, options, print, args) {
         // Global declaration looks like this:
         // (declare)? global { ... }
         const isGlobalDeclaration =
-          n.name.type === "Identifier" &&
-          n.name.name === "global" &&
+          n.id.type === "Identifier" &&
+          n.id.name === "global" &&
           !/namespace|module/.test(
-            options.originalText.slice(util.locStart(n), util.locStart(n.name))
+            options.originalText.slice(util.locStart(n), util.locStart(n.id))
           );
 
         if (!isGlobalDeclaration) {
@@ -2699,7 +2709,7 @@ function genericPrintNoParens(path, options, print, args) {
         }
       }
 
-      parts.push(path.call(print, "name"));
+      parts.push(path.call(print, "id"));
 
       if (bodyIsDeclaration) {
         parts.push(path.call(print, "body"));
@@ -3368,10 +3378,13 @@ function getFlowVariance(path) {
 
 function printTypeScriptModifiers(path, options, print) {
   const n = path.getValue();
-  if (!n.modifiers || !n.modifiers.length) {
-    return "";
-  }
-  return concat([join(" ", path.map(print, "modifiers")), " "]);
+
+  if (n.abstract) return "abstract ";
+  if (n.const) return "const ";
+
+  return n.modifiers && n.modifiers.length
+    ? concat([join(" ", path.map(print, "modifiers")), " "])
+    : "";
 }
 
 function printTypeParameters(path, options, print, paramsKey) {

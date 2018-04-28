@@ -39,7 +39,7 @@ function run_spec(dirname, options, additionalParsers) {
         rangeEnd: rangeEnd
       });
       const output = prettyprint(source, path, mergedOptions);
-      test(`${mergedOptions.parser} - ${parser.parser}-verify`, () => {
+      test(`${filename} - ${mergedOptions.parser}-verify`, () => {
         expect(raw(source + "~".repeat(80) + "\n" + output)).toMatchSnapshot(
           filename
         );
@@ -49,10 +49,10 @@ function run_spec(dirname, options, additionalParsers) {
         mergedOptions.parser,
         additionalParsers || []
       ).forEach(parserName => {
-        test(`${filename} - ${parserName}-verify`, () => {
-          const verifyOptions = Object.assign(mergedOptions, {
-            parser: parserName
-          });
+        const verifyOptions = Object.assign(mergedOptions, {
+          parser: parserName
+        });
+        test(`${filename} - ${mergedOptions.parser}/${verifyOptions.parser}-verify-2`, () => {
           const verifyOutput = prettyprint(source, path, verifyOptions);
           expect(output).toEqual(verifyOutput);
         });

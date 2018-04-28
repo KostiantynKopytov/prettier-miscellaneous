@@ -212,6 +212,7 @@ function isSourceElement(opts, node) {
     case "InterfaceDeclaration": // Flow, Typescript
     case "TypeAliasDeclaration": // Typescript
     case "ExportAssignment": // Typescript
+    case "TSExportAssignment": // Typescript
     case "ExportDeclaration": // Typescript
     case "OperationDefinition": // GraphQL
     case "FragmentDefinition": // GraphQL
